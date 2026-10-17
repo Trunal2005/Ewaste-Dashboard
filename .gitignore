@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build Outputs
+dist/
+dist-ssr/
+build/
+*.local
+
+# CRITICAL ACADEMIC DATA PRESERVATION & PRIVACY:
+# Do NOT commit SQLite databases or user-uploaded assignment files to public GitHub.
+# Data is migrated to production persistent volumes using scripts/migrate-to-prod.ts.
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite3
+uploads/
+uploads/*
+
+# Environment Secrets & Local Configs
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor & OS files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
