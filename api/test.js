@@ -1,3 +1,11 @@
+import express from 'express'
+
+const app = express()
+
+app.get('/api/test', (req, res) => {
+  res.json({ status: 'ok', express: true, time: new Date().toISOString() })
+})
+
 export default function handler(req, res) {
-  res.status(200).json({ status: 'ok', message: 'test function working' })
+  return app(req, res)
 }
