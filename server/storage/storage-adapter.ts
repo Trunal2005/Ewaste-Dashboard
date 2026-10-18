@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
-import { put, head, del, BlobNotFoundError } from '@vercel/blob'
+import { put, head, del, get, BlobNotFoundError } from '@vercel/blob'
 
 export interface StorageAdapter {
   save(buffer: Buffer, internalId: string, originalName: string): Promise<string>
@@ -10,6 +10,15 @@ export interface StorageAdapter {
   delete(internalId: string): Promise<void>
   getFilePath(internalId: string): string | null
   getUrl(internalId: string): Promise<string | null>
+  isCloud(): boolean
+}
+
+export function hasBlobStorageConfigured(): boolean {
+  return Boolean(
+    process.env.BLOB_READ_WRITE_TOKEN ||
+    (process.env.VERCEL_OIDC_TOKEN && process.env.BLOB_STORE_ID) ||
+    (process.env.VERCEL && (process.env.BLOB_STORE_ID || process.env.VERCEL_OIDC_TOKEN))
+  )
 }
 
 export class LocalDiskStorageAdapter implements StorageAdapter {
@@ -21,9 +30,13 @@ export class LocalDiskStorageAdapter implements StorageAdapter {
       if (!fs.existsSync(this.uploadsDir)) {
         fs.mkdirSync(this.uploadsDir, { recursive: true })
       }
-    } catch (e) {
+    } catch {
       // In serverless read-only filesystem environments, catch EROFS gracefully
     }
+  }
+
+  isCloud(): boolean {
+    return false
   }
 
   getFilePath(internalId: string): string {
@@ -64,9 +77,17 @@ export class VercelBlobStorageAdapter implements StorageAdapter {
 
   constructor() {
     this.cacheDir = path.join(os.tmpdir(), 'ewem-uploads-cache')
-    if (!fs.existsSync(this.cacheDir)) {
-      fs.mkdirSync(this.cacheDir, { recursive: true })
+    try {
+      if (!fs.existsSync(this.cacheDir)) {
+        fs.mkdirSync(this.cacheDir, { recursive: true })
+      }
+    } catch {
+      // Ignore EROFS
     }
+  }
+
+  isCloud(): boolean {
+    return true
   }
 
   private getBlobPath(internalId: string): string {
@@ -88,12 +109,16 @@ export class VercelBlobStorageAdapter implements StorageAdapter {
     const blobPath = this.getBlobPath(internalId)
     const localCache = this.getLocalCachePath(internalId)
 
-    // Write to local cache in /tmp
-    await fs.promises.writeFile(localCache, buffer).catch(() => {})
+    // Write to local cache in /tmp for immediate read availability
+    try {
+      await fs.promises.writeFile(localCache, buffer)
+    } catch {
+      // Ignore cache write failures
+    }
 
-    // Upload to Vercel Blob
+    // Upload to Vercel Blob with PRIVATE access to protect academic documents
     await put(blobPath, buffer, {
-      access: 'public',
+      access: 'private',
       addRandomSuffix: false,
       allowOverwrite: true,
     })
@@ -102,16 +127,9 @@ export class VercelBlobStorageAdapter implements StorageAdapter {
   }
 
   async getUrl(internalId: string): Promise<string | null> {
-    const blobPath = this.getBlobPath(internalId)
-    try {
-      const details = await head(blobPath)
-      return details ? details.url : null
-    } catch (err: any) {
-      if (err instanceof BlobNotFoundError || err?.name === 'BlobNotFoundError') {
-        return null
-      }
-      return null
-    }
+    // For private blobs, do NOT expose raw URLs or public CDN links.
+    // Authorized downloads are routed through backend streaming endpoints.
+    return `/api/files/${encodeURIComponent(internalId)}/download`
   }
 
   async exists(internalId: string): Promise<boolean> {
@@ -121,8 +139,17 @@ export class VercelBlobStorageAdapter implements StorageAdapter {
     const blobPath = this.getBlobPath(internalId)
     try {
       const details = await head(blobPath)
-      return Boolean(details && details.url)
+      if (details && details.url) return true
     } catch (err: any) {
+      if (err instanceof BlobNotFoundError || err?.name === 'BlobNotFoundError') {
+        // continue to try get
+      }
+    }
+
+    try {
+      const result = await get(blobPath, { access: 'private' })
+      return Boolean(result && result.stream)
+    } catch {
       return false
     }
   }
@@ -130,27 +157,43 @@ export class VercelBlobStorageAdapter implements StorageAdapter {
   async read(internalId: string): Promise<Buffer> {
     const localCache = this.getLocalCachePath(internalId)
     if (fs.existsSync(localCache)) {
-      return await fs.promises.readFile(localCache)
+      try {
+        return await fs.promises.readFile(localCache)
+      } catch {
+        // Fall back to fetching from blob
+      }
     }
 
     const blobPath = this.getBlobPath(internalId)
-    const details = await head(blobPath)
-    if (!details || !details.url) {
-      throw new Error(`Blob not found: ${blobPath}`)
+    try {
+      const result = await get(blobPath, { access: 'private' })
+      if (!result || !result.stream) {
+        throw new Error(`Private blob not found: ${blobPath}`)
+      }
+
+      const reader = result.stream.getReader()
+      const chunks: Uint8Array[] = []
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (value) chunks.push(value)
+      }
+      const buffer = Buffer.concat(chunks)
+
+      // Cache locally in /tmp for fast subsequent reads within lambda container
+      try {
+        await fs.promises.writeFile(localCache, buffer)
+      } catch {
+        // Ignore cache write failure
+      }
+
+      return buffer
+    } catch (err: any) {
+      if (err instanceof BlobNotFoundError || err?.name === 'BlobNotFoundError') {
+        throw new Error(`Blob not found: ${blobPath}`)
+      }
+      throw err
     }
-
-    const res = await fetch(details.url)
-    if (!res.ok) {
-      throw new Error(`Failed to download blob from URL: ${details.url} (Status ${res.status})`)
-    }
-
-    const arrayBuf = await res.arrayBuffer()
-    const buffer = Buffer.from(arrayBuf)
-
-    // Cache locally for fast subsequent reads
-    await fs.promises.writeFile(localCache, buffer).catch(() => {})
-
-    return buffer
   }
 
   async delete(internalId: string): Promise<void> {
@@ -162,7 +205,7 @@ export class VercelBlobStorageAdapter implements StorageAdapter {
     const blobPath = this.getBlobPath(internalId)
     try {
       await del(blobPath)
-    } catch (err) {
+    } catch {
       // Ignore not found error on delete
     }
   }
@@ -170,11 +213,11 @@ export class VercelBlobStorageAdapter implements StorageAdapter {
 
 /**
  * Creates the appropriate storage adapter depending on the runtime environment.
- * If BLOB_READ_WRITE_TOKEN is defined, uses Vercel Blob Storage.
+ * If Vercel Blob credentials (token or OIDC) are configured, uses Vercel Blob Storage with private access.
  * Otherwise, falls back to local disk storage.
  */
 export function createStorageAdapter(uploadsDir?: string): StorageAdapter {
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
+  if (hasBlobStorageConfigured()) {
     return new VercelBlobStorageAdapter()
   }
   const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME)
