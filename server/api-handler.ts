@@ -1,11 +1,18 @@
 import app, { initBackend } from './app'
 
-let isReady = false
+let initPromise: Promise<void> | null = null
 
-export default async function handler(req: any, res: any) {
-  if (!isReady) {
-    await initBackend()
-    isReady = true
+// Serverless initialization middleware ensures DB is ready before routes execute
+app.use(async (_req, _res, next) => {
+  try {
+    if (!initPromise) {
+      initPromise = initBackend()
+    }
+    await initPromise
+    next()
+  } catch (err) {
+    next(err)
   }
-  return app(req, res)
-}
+})
+
+export default app
