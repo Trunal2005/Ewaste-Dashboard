@@ -20698,7 +20698,7 @@ var require_route = __commonJS({
         sync = 0;
       }
     };
-    Route.prototype.all = function all(handler) {
+    Route.prototype.all = function all(handler2) {
       const callbacks = flatten.call(slice.call(arguments), Infinity);
       if (callbacks.length === 0) {
         throw new TypeError("argument handler is required");
@@ -20716,7 +20716,7 @@ var require_route = __commonJS({
       return this;
     };
     methods.forEach(function(method) {
-      Route.prototype[method] = function(handler) {
+      Route.prototype[method] = function(handler2) {
         const callbacks = flatten.call(slice.call(arguments), Infinity);
         if (callbacks.length === 0) {
           throw new TypeError("argument handler is required");
@@ -20919,17 +20919,17 @@ var require_router = __commonJS({
         }
       }
     };
-    Router.prototype.use = function use(handler) {
+    Router.prototype.use = function use(handler2) {
       let offset = 0;
       let path4 = "/";
-      if (typeof handler !== "function") {
-        let arg = handler;
+      if (typeof handler2 !== "function") {
+        let arg = handler2;
         while (Array.isArray(arg) && arg.length !== 0) {
           arg = arg[0];
         }
         if (typeof arg !== "function") {
           offset = 1;
-          path4 = handler;
+          path4 = handler2;
         }
       }
       const callbacks = flatten.call(slice.call(arguments, offset), Infinity);
@@ -51602,31 +51602,31 @@ var require_util = __commonJS({
     function isBuffer2(buffer) {
       return buffer instanceof Uint8Array || Buffer.isBuffer(buffer);
     }
-    function validateHandler(handler, method, upgrade) {
-      if (!handler || typeof handler !== "object") {
+    function validateHandler(handler2, method, upgrade) {
+      if (!handler2 || typeof handler2 !== "object") {
         throw new InvalidArgumentError("handler must be an object");
       }
-      if (typeof handler.onConnect !== "function") {
+      if (typeof handler2.onConnect !== "function") {
         throw new InvalidArgumentError("invalid onConnect method");
       }
-      if (typeof handler.onError !== "function") {
+      if (typeof handler2.onError !== "function") {
         throw new InvalidArgumentError("invalid onError method");
       }
-      if (typeof handler.onBodySent !== "function" && handler.onBodySent !== void 0) {
+      if (typeof handler2.onBodySent !== "function" && handler2.onBodySent !== void 0) {
         throw new InvalidArgumentError("invalid onBodySent method");
       }
       if (upgrade || method === "CONNECT") {
-        if (typeof handler.onUpgrade !== "function") {
+        if (typeof handler2.onUpgrade !== "function") {
           throw new InvalidArgumentError("invalid onUpgrade method");
         }
       } else {
-        if (typeof handler.onHeaders !== "function") {
+        if (typeof handler2.onHeaders !== "function") {
           throw new InvalidArgumentError("invalid onHeaders method");
         }
-        if (typeof handler.onData !== "function") {
+        if (typeof handler2.onData !== "function") {
           throw new InvalidArgumentError("invalid onData method");
         }
-        if (typeof handler.onComplete !== "function") {
+        if (typeof handler2.onComplete !== "function") {
           throw new InvalidArgumentError("invalid onComplete method");
         }
       }
@@ -52069,7 +52069,7 @@ var require_request2 = __commonJS({
         throwOnError,
         expectContinue,
         servername
-      }, handler) {
+      }, handler2) {
         if (typeof path4 !== "string") {
           throw new InvalidArgumentError("path must be a string");
         } else if (path4[0] !== "/" && !(path4.startsWith("http://") || path4.startsWith("https://")) && method !== "CONNECT") {
@@ -52174,9 +52174,9 @@ var require_request2 = __commonJS({
         } else if (headers != null) {
           throw new InvalidArgumentError("headers must be an object or an array");
         }
-        validateHandler(handler, method, upgrade);
+        validateHandler(handler2, method, upgrade);
         this.servername = servername || getServerName(this.host);
-        this[kHandler] = handler;
+        this[kHandler] = handler2;
         if (channels.create.hasSubscribers) {
           channels.create.publish({ request: this });
         }
@@ -52614,20 +52614,20 @@ var require_dispatcher_base = __commonJS({
           queueMicrotask(onDestroyed);
         });
       }
-      [kInterceptedDispatch](opts, handler) {
+      [kInterceptedDispatch](opts, handler2) {
         if (!this[kInterceptors] || this[kInterceptors].length === 0) {
           this[kInterceptedDispatch] = this[kDispatch];
-          return this[kDispatch](opts, handler);
+          return this[kDispatch](opts, handler2);
         }
         let dispatch = this[kDispatch].bind(this);
         for (let i = this[kInterceptors].length - 1; i >= 0; i--) {
           dispatch = this[kInterceptors][i](dispatch);
         }
         this[kInterceptedDispatch] = dispatch;
-        return dispatch(opts, handler);
+        return dispatch(opts, handler2);
       }
-      dispatch(opts, handler) {
-        if (!handler || typeof handler !== "object") {
+      dispatch(opts, handler2) {
+        if (!handler2 || typeof handler2 !== "object") {
           throw new InvalidArgumentError("handler must be an object");
         }
         try {
@@ -52640,12 +52640,12 @@ var require_dispatcher_base = __commonJS({
           if (this[kClosed]) {
             throw new ClientClosedError();
           }
-          return this[kInterceptedDispatch](opts, handler);
+          return this[kInterceptedDispatch](opts, handler2);
         } catch (err) {
-          if (typeof handler.onError !== "function") {
+          if (typeof handler2.onError !== "function") {
             throw new InvalidArgumentError("invalid onError method");
           }
-          handler.onError(err);
+          handler2.onError(err);
           return false;
         }
       }
@@ -57835,17 +57835,17 @@ var require_redirect_handler = __commonJS({
       }
     };
     var RedirectHandler = class {
-      constructor(dispatch, maxRedirections, opts, handler) {
+      constructor(dispatch, maxRedirections, opts, handler2) {
         if (maxRedirections != null && (!Number.isInteger(maxRedirections) || maxRedirections < 0)) {
           throw new InvalidArgumentError("maxRedirections must be a positive number");
         }
-        util.validateHandler(handler, opts.method, opts.upgrade);
+        util.validateHandler(handler2, opts.method, opts.upgrade);
         this.dispatch = dispatch;
         this.location = null;
         this.abort = null;
         this.opts = { ...opts, maxRedirections: 0 };
         this.maxRedirections = maxRedirections;
-        this.handler = handler;
+        this.handler = handler2;
         this.history = [];
         this.redirectionLimitReached = false;
         if (util.isStream(this.opts.body)) {
@@ -57978,12 +57978,12 @@ var require_redirect_interceptor = __commonJS({
     var RedirectHandler = require_redirect_handler();
     function createRedirectInterceptor({ maxRedirections: defaultMaxRedirections }) {
       return (dispatch) => {
-        return function Intercept(opts, handler) {
+        return function Intercept(opts, handler2) {
           const { maxRedirections = defaultMaxRedirections } = opts;
           if (!maxRedirections) {
-            return dispatch(opts, handler);
+            return dispatch(opts, handler2);
           }
-          const redirectHandler = new RedirectHandler(dispatch, maxRedirections, opts, handler);
+          const redirectHandler = new RedirectHandler(dispatch, maxRedirections, opts, handler2);
           opts = { ...opts, maxRedirections: 0 };
           return dispatch(opts, redirectHandler);
         };
@@ -58243,9 +58243,9 @@ var require_client = __commonJS({
         connect(this);
         this.once("connect", cb);
       }
-      [kDispatch](opts, handler) {
+      [kDispatch](opts, handler2) {
         const origin = opts.origin || this[kUrl].origin;
-        const request = new Request3(origin, opts, handler);
+        const request = new Request3(origin, opts, handler2);
         this[kQueue].push(request);
         if (this[kResuming]) {
         } else if (util.bodyLength(request.body) == null && util.isIterable(request.body)) {
@@ -58694,13 +58694,13 @@ var require_pool_base = __commonJS({
         }
         await Promise.all(this[kClients].map((c) => c.destroy(err)));
       }
-      [kDispatch](opts, handler) {
+      [kDispatch](opts, handler2) {
         const dispatcher = this[kGetDispatcher]();
         if (!dispatcher) {
           this[kNeedDrain] = true;
-          this[kQueue].push({ opts, handler });
+          this[kQueue].push({ opts, handler: handler2 });
           this[kQueued]++;
-        } else if (!dispatcher.dispatch(opts, handler)) {
+        } else if (!dispatcher.dispatch(opts, handler2)) {
           dispatcher[kNeedDrain] = true;
           this[kNeedDrain] = !this[kGetDispatcher]();
         }
@@ -59039,7 +59039,7 @@ var require_agent = __commonJS({
         }
         return ret;
       }
-      [kDispatch](opts, handler) {
+      [kDispatch](opts, handler2) {
         let key;
         if (opts.origin && (typeof opts.origin === "string" || opts.origin instanceof URL)) {
           key = String(opts.origin);
@@ -59051,7 +59051,7 @@ var require_agent = __commonJS({
           dispatcher = this[kFactory](opts.origin, this[kOptions]).on("drain", this[kOnDrain]).on("connect", this[kOnConnect]).on("disconnect", this[kOnDisconnect]).on("connectionError", this[kOnConnectionError]);
           this[kClients].set(key, dispatcher);
         }
-        return dispatcher.dispatch(opts, handler);
+        return dispatcher.dispatch(opts, handler2);
       }
       async [kClose]() {
         const closePromises = [];
@@ -59121,12 +59121,12 @@ var require_proxy_agent = __commonJS({
           this.#client = new Client(proxyUrl, { connect });
         }
       }
-      [kDispatch](opts, handler) {
-        const onHeaders = handler.onHeaders;
-        handler.onHeaders = function(statusCode, data, resume) {
+      [kDispatch](opts, handler2) {
+        const onHeaders = handler2.onHeaders;
+        handler2.onHeaders = function(statusCode, data, resume) {
           if (statusCode === 407) {
-            if (typeof handler.onError === "function") {
-              handler.onError(new InvalidArgumentError("Proxy Authentication Required (407)"));
+            if (typeof handler2.onError === "function") {
+              handler2.onError(new InvalidArgumentError("Proxy Authentication Required (407)"));
             }
             return;
           }
@@ -59143,7 +59143,7 @@ var require_proxy_agent = __commonJS({
           headers.host = host;
         }
         opts.headers = { ...this[kProxyHeaders], ...headers };
-        return this.#client[kDispatch](opts, handler);
+        return this.#client[kDispatch](opts, handler2);
       }
       async [kClose]() {
         return this.#client.close();
@@ -59240,7 +59240,7 @@ var require_proxy_agent = __commonJS({
           }
         });
       }
-      dispatch(opts, handler) {
+      dispatch(opts, handler2) {
         const headers = buildHeaders(opts.headers);
         throwIfProxyAuthIsSent(headers);
         if (headers && !("host" in headers) && !("Host" in headers)) {
@@ -59252,7 +59252,7 @@ var require_proxy_agent = __commonJS({
             ...opts,
             headers
           },
-          handler
+          handler2
         );
       }
       /**
@@ -59339,10 +59339,10 @@ var require_env_http_proxy_agent = __commonJS({
         }
         this.#parseNoProxy();
       }
-      [kDispatch](opts, handler) {
+      [kDispatch](opts, handler2) {
         const url = new URL(opts.origin);
         const agent = this.#getProxyAgentForUrl(url);
-        return agent.dispatch(opts, handler);
+        return agent.dispatch(opts, handler2);
       }
       async [kClose]() {
         await this[kNoProxyAgent].close();
@@ -59796,13 +59796,13 @@ var require_retry_agent = __commonJS({
         this.#agent = agent;
         this.#options = options;
       }
-      dispatch(opts, handler) {
+      dispatch(opts, handler2) {
         const retry2 = new RetryHandler({
           ...opts,
           retryOptions: this.#options
         }, {
           dispatch: this.#agent.dispatch.bind(this.#agent),
-          handler
+          handler: handler2
         });
         return this.#agent.dispatch(opts, retry2);
       }
@@ -60633,11 +60633,11 @@ var require_api_pipeline = __commonJS({
       }
     };
     var PipelineHandler = class extends AsyncResource {
-      constructor(opts, handler) {
+      constructor(opts, handler2) {
         if (!opts || typeof opts !== "object") {
           throw new InvalidArgumentError("invalid opts");
         }
-        if (typeof handler !== "function") {
+        if (typeof handler2 !== "function") {
           throw new InvalidArgumentError("invalid handler");
         }
         const { signal, method, opaque, onInfo, responseHeaders } = opts;
@@ -60653,7 +60653,7 @@ var require_api_pipeline = __commonJS({
         super("UNDICI_PIPELINE");
         this.opaque = opaque || null;
         this.responseHeaders = responseHeaders || null;
-        this.handler = handler;
+        this.handler = handler2;
         this.abort = null;
         this.context = null;
         this.onInfo = onInfo || null;
@@ -60708,7 +60708,7 @@ var require_api_pipeline = __commonJS({
         this.context = context;
       }
       onHeaders(statusCode, rawHeaders, resume) {
-        const { opaque, handler, context } = this;
+        const { opaque, handler: handler2, context } = this;
         if (statusCode < 200) {
           if (this.onInfo) {
             const headers = this.responseHeaders === "raw" ? util.parseRawHeaders(rawHeaders) : util.parseHeaders(rawHeaders);
@@ -60721,7 +60721,7 @@ var require_api_pipeline = __commonJS({
         try {
           this.handler = null;
           const headers = this.responseHeaders === "raw" ? util.parseRawHeaders(rawHeaders) : util.parseHeaders(rawHeaders);
-          body = this.runInAsyncScope(handler, null, {
+          body = this.runInAsyncScope(handler2, null, {
             statusCode,
             headers,
             opaque,
@@ -60768,9 +60768,9 @@ var require_api_pipeline = __commonJS({
         util.destroy(ret, err);
       }
     };
-    function pipeline(opts, handler) {
+    function pipeline(opts, handler2) {
       try {
-        const pipelineHandler = new PipelineHandler(opts, handler);
+        const pipelineHandler = new PipelineHandler(opts, handler2);
         this.dispatch({ ...opts, body: pipelineHandler.req }, pipelineHandler);
         return pipelineHandler.ret;
       } catch (err) {
@@ -61218,7 +61218,7 @@ var require_mock_utils = __commonJS({
       }
       return Buffer.concat(buffers).toString("utf8");
     }
-    function mockDispatch(opts, handler) {
+    function mockDispatch(opts, handler2) {
       const key = buildKey(opts);
       const mockDispatch2 = getMockDispatch(this[kDispatches], key);
       mockDispatch2.timesInvoked++;
@@ -61231,7 +61231,7 @@ var require_mock_utils = __commonJS({
       mockDispatch2.pending = timesInvoked < times;
       if (error !== null) {
         deleteMockDispatch(this[kDispatches], key);
-        handler.onError(error);
+        handler2.onError(error);
         return true;
       }
       if (typeof delay === "number" && delay > 0) {
@@ -61251,10 +61251,10 @@ var require_mock_utils = __commonJS({
         const responseData = getResponseData(body);
         const responseHeaders = generateKeyValues(headers);
         const responseTrailers = generateKeyValues(trailers);
-        handler.onConnect?.((err) => handler.onError(err), null);
-        handler.onHeaders?.(statusCode, responseHeaders, resume, getStatusText(statusCode));
-        handler.onData?.(Buffer.from(responseData));
-        handler.onComplete?.(responseTrailers);
+        handler2.onConnect?.((err) => handler2.onError(err), null);
+        handler2.onHeaders?.(statusCode, responseHeaders, resume, getStatusText(statusCode));
+        handler2.onData?.(Buffer.from(responseData));
+        handler2.onComplete?.(responseTrailers);
         deleteMockDispatch(mockDispatches, key);
       }
       function resume() {
@@ -61265,10 +61265,10 @@ var require_mock_utils = __commonJS({
       const agent = this[kMockAgent];
       const origin = this[kOrigin];
       const originalDispatch = this[kOriginalDispatch];
-      return function dispatch(opts, handler) {
+      return function dispatch(opts, handler2) {
         if (agent.isMockActive) {
           try {
-            mockDispatch.call(this, opts, handler);
+            mockDispatch.call(this, opts, handler2);
           } catch (error) {
             if (error instanceof MockNotMatchedError) {
               const netConnect = agent[kGetNetConnect]();
@@ -61276,7 +61276,7 @@ var require_mock_utils = __commonJS({
                 throw new MockNotMatchedError(`${error.message}: subsequent request to origin ${origin} was not allowed (net.connect disabled)`);
               }
               if (checkNetConnect(netConnect, origin)) {
-                originalDispatch.call(this, opts, handler);
+                originalDispatch.call(this, opts, handler2);
               } else {
                 throw new MockNotMatchedError(`${error.message}: subsequent request to origin ${origin} was not allowed (net.connect is not enabled for this origin)`);
               }
@@ -61285,7 +61285,7 @@ var require_mock_utils = __commonJS({
             }
           }
         } else {
-          originalDispatch.call(this, opts, handler);
+          originalDispatch.call(this, opts, handler2);
         }
       };
     }
@@ -61709,9 +61709,9 @@ var require_mock_agent = __commonJS({
         }
         return dispatcher;
       }
-      dispatch(opts, handler) {
+      dispatch(opts, handler2) {
         this.get(opts.origin);
-        return this[kAgent].dispatch(opts, handler);
+        return this[kAgent].dispatch(opts, handler2);
       }
       async close() {
         await this[kAgent].close();
@@ -61831,11 +61831,11 @@ var require_decorator_handler = __commonJS({
     "use strict";
     module.exports = class DecoratorHandler {
       #handler;
-      constructor(handler) {
-        if (typeof handler !== "object" || handler === null) {
+      constructor(handler2) {
+        if (typeof handler2 !== "object" || handler2 === null) {
           throw new TypeError("handler must be an object");
         }
-        this.#handler = handler;
+        this.#handler = handler2;
       }
       onConnect(...args) {
         return this.#handler.onConnect?.(...args);
@@ -61873,16 +61873,16 @@ var require_redirect = __commonJS({
     module.exports = (opts) => {
       const globalMaxRedirections = opts?.maxRedirections;
       return (dispatch) => {
-        return function redirectInterceptor(opts2, handler) {
+        return function redirectInterceptor(opts2, handler2) {
           const { maxRedirections = globalMaxRedirections, ...baseOpts } = opts2;
           if (!maxRedirections) {
-            return dispatch(opts2, handler);
+            return dispatch(opts2, handler2);
           }
           const redirectHandler = new RedirectHandler(
             dispatch,
             maxRedirections,
             opts2,
-            handler
+            handler2
           );
           return dispatch(baseOpts, redirectHandler);
         };
@@ -61898,13 +61898,13 @@ var require_retry3 = __commonJS({
     var RetryHandler = require_retry_handler();
     module.exports = (globalOpts) => {
       return (dispatch) => {
-        return function retryInterceptor(opts, handler) {
+        return function retryInterceptor(opts, handler2) {
           return dispatch(
             opts,
             new RetryHandler(
               { ...opts, retryOptions: { ...globalOpts, ...opts.retryOptions } },
               {
-                handler,
+                handler: handler2,
                 dispatch
               }
             )
@@ -61930,13 +61930,13 @@ var require_dump = __commonJS({
       #size = 0;
       #reason = null;
       #handler = null;
-      constructor({ maxSize }, handler) {
-        super(handler);
+      constructor({ maxSize }, handler2) {
+        super(handler2);
         if (maxSize != null && (!Number.isFinite(maxSize) || maxSize < 1)) {
           throw new InvalidArgumentError("maxSize must be a number greater than 0");
         }
         this.#maxSize = maxSize ?? this.#maxSize;
-        this.#handler = handler;
+        this.#handler = handler2;
       }
       onConnect(abort) {
         this.#abort = abort;
@@ -61999,11 +61999,11 @@ var require_dump = __commonJS({
       maxSize: 1024 * 1024
     }) {
       return (dispatch) => {
-        return function Intercept(opts, handler) {
+        return function Intercept(opts, handler2) {
           const { dumpMaxSize = defaultMaxSize } = opts;
           const dumpHandler = new DumpHandler(
             { maxSize: dumpMaxSize },
-            handler
+            handler2
           );
           return dispatch(opts, dumpHandler);
         };
@@ -62194,10 +62194,10 @@ var require_dns = __commonJS({
       #dispatch = null;
       #handler = null;
       #origin = null;
-      constructor(state, { origin, handler, dispatch }, opts) {
-        super(handler);
+      constructor(state, { origin, handler: handler2, dispatch }, opts) {
+        super(handler2);
         this.#origin = origin;
-        this.#handler = handler;
+        this.#handler = handler2;
         this.#opts = { ...opts };
         this.#state = state;
         this.#dispatch = dispatch;
@@ -62270,14 +62270,14 @@ var require_dns = __commonJS({
       };
       const instance = new DNSInstance(opts);
       return (dispatch) => {
-        return function dnsInterceptor(origDispatchOpts, handler) {
+        return function dnsInterceptor(origDispatchOpts, handler2) {
           const origin = origDispatchOpts.origin.constructor === URL ? origDispatchOpts.origin : new URL(origDispatchOpts.origin);
           if (isIP(origin.hostname) !== 0) {
-            return dispatch(origDispatchOpts, handler);
+            return dispatch(origDispatchOpts, handler2);
           }
           instance.runLookup(origin, origDispatchOpts, (err, newOrigin) => {
             if (err) {
-              return handler.onError(err);
+              return handler2.onError(err);
             }
             let dispatchOpts = null;
             dispatchOpts = {
@@ -62292,7 +62292,7 @@ var require_dns = __commonJS({
             };
             dispatch(
               dispatchOpts,
-              instance.getHandler({ origin, dispatch, handler }, origDispatchOpts)
+              instance.getHandler({ origin, dispatch, handler: handler2 }, origDispatchOpts)
             );
           });
           return true;
@@ -69436,9 +69436,9 @@ var require_undici = __commonJS({
       headerNameToString: util.headerNameToString
     };
     function makeDispatcher(fn) {
-      return (url, opts, handler) => {
+      return (url, opts, handler2) => {
         if (typeof opts === "function") {
-          handler = opts;
+          handler2 = opts;
           opts = null;
         }
         if (!url || typeof url !== "string" && typeof url !== "object" && !(url instanceof URL)) {
@@ -69471,7 +69471,7 @@ var require_undici = __commonJS({
           origin: url.origin,
           path: url.search ? `${url.pathname}${url.search}` : url.pathname,
           method: opts.method || (opts.body ? "PUT" : "GET")
-        }, handler);
+        }, handler2);
       };
     }
     module.exports.setGlobalDispatcher = setGlobalDispatcher;
@@ -71251,8 +71251,11 @@ var SQLiteDB = class {
       this.dbFilePath = tmpPath;
     } else {
       const dbDir = path.dirname(this.dbFilePath);
-      if (!fs.existsSync(dbDir)) {
-        fs.mkdirSync(dbDir, { recursive: true });
+      try {
+        if (!fs.existsSync(dbDir)) {
+          fs.mkdirSync(dbDir, { recursive: true });
+        }
+      } catch (e) {
       }
       if (fs.existsSync(this.dbFilePath)) {
         const fileBuffer = fs.readFileSync(this.dbFilePath);
@@ -71606,8 +71609,8 @@ var SQLiteDB = class {
     );
   }
 };
-var dataDir = path.resolve(process.cwd(), "data");
-var defaultDbPath = path.join(dataDir, "ewaste.sqlite");
+var isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+var defaultDbPath = isVercel ? path.join(os.tmpdir(), "ewaste.sqlite") : path.resolve(process.cwd(), "data", "ewaste.sqlite");
 var dbPath = process.env.DB_PATH || defaultDbPath;
 var db = new SQLiteDB(dbPath);
 
@@ -71619,8 +71622,11 @@ var LocalDiskStorageAdapter = class {
   uploadsDir;
   constructor(uploadsDir) {
     this.uploadsDir = uploadsDir;
-    if (!fs2.existsSync(this.uploadsDir)) {
-      fs2.mkdirSync(this.uploadsDir, { recursive: true });
+    try {
+      if (!fs2.existsSync(this.uploadsDir)) {
+        fs2.mkdirSync(this.uploadsDir, { recursive: true });
+      }
+    } catch (e) {
     }
   }
   getFilePath(internalId) {
@@ -71742,7 +71748,9 @@ function createStorageAdapter(uploadsDir) {
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     return new VercelBlobStorageAdapter();
   }
-  const dir = uploadsDir || process.env.UPLOADS_DIR || path2.resolve(process.cwd(), "uploads");
+  const isVercel2 = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  const defaultDir = isVercel2 ? path2.join(os2.tmpdir(), "ewem-uploads") : path2.resolve(process.cwd(), "uploads");
+  const dir = uploadsDir || process.env.UPLOADS_DIR || defaultDir;
   return new LocalDiskStorageAdapter(dir);
 }
 
@@ -72319,20 +72327,27 @@ var app_default = app;
 
 // server/api-handler.ts
 var initPromise = null;
-app_default.use(async (_req, _res, next) => {
+async function handler(req, res) {
   try {
     if (!initPromise) {
       initPromise = initBackend();
     }
     await initPromise;
-    next();
+    return app_default(req, res);
   } catch (err) {
-    next(err);
+    console.error("API Handler Error:", err);
+    res.statusCode = 500;
+    res.setHeader("Content-Type", "application/json");
+    res.end(
+      JSON.stringify({
+        error: err?.message || String(err),
+        stack: err?.stack || null
+      })
+    );
   }
-});
-var api_handler_default = app_default;
+}
 export {
-  api_handler_default as default
+  handler as default
 };
 /*! Bundled license information:
 

@@ -95,8 +95,12 @@ class SQLiteDB {
     } else {
       // Local development disk storage
       const dbDir = path.dirname(this.dbFilePath)
-      if (!fs.existsSync(dbDir)) {
-        fs.mkdirSync(dbDir, { recursive: true })
+      try {
+        if (!fs.existsSync(dbDir)) {
+          fs.mkdirSync(dbDir, { recursive: true })
+        }
+      } catch (e) {
+        // Safe on read-only environments
       }
 
       if (fs.existsSync(this.dbFilePath)) {
@@ -475,7 +479,9 @@ class SQLiteDB {
 }
 
 // Singleton database instance located in data/ewaste.sqlite or configured persistent volume via DB_PATH
-const dataDir = path.resolve(process.cwd(), 'data')
-const defaultDbPath = path.join(dataDir, 'ewaste.sqlite')
+const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME)
+const defaultDbPath = isVercel
+  ? path.join(os.tmpdir(), 'ewaste.sqlite')
+  : path.resolve(process.cwd(), 'data', 'ewaste.sqlite')
 const dbPath = process.env.DB_PATH || defaultDbPath
 export const db = new SQLiteDB(dbPath)

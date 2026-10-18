@@ -17,8 +17,12 @@ export class LocalDiskStorageAdapter implements StorageAdapter {
 
   constructor(uploadsDir: string) {
     this.uploadsDir = uploadsDir
-    if (!fs.existsSync(this.uploadsDir)) {
-      fs.mkdirSync(this.uploadsDir, { recursive: true })
+    try {
+      if (!fs.existsSync(this.uploadsDir)) {
+        fs.mkdirSync(this.uploadsDir, { recursive: true })
+      }
+    } catch (e) {
+      // In serverless read-only filesystem environments, catch EROFS gracefully
     }
   }
 
@@ -173,6 +177,10 @@ export function createStorageAdapter(uploadsDir?: string): StorageAdapter {
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     return new VercelBlobStorageAdapter()
   }
-  const dir = uploadsDir || process.env.UPLOADS_DIR || path.resolve(process.cwd(), 'uploads')
+  const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME)
+  const defaultDir = isVercel
+    ? path.join(os.tmpdir(), 'ewem-uploads')
+    : path.resolve(process.cwd(), 'uploads')
+  const dir = uploadsDir || process.env.UPLOADS_DIR || defaultDir
   return new LocalDiskStorageAdapter(dir)
 }
