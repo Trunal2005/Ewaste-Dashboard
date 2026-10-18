@@ -1,6 +1,5 @@
-// @ts-ignore
-import initSqlJsAsm from 'sql.js/dist/sql-asm.js'
-import type { Database, SqlValue } from 'sql.js'
+import initSqlJs, { Database, SqlValue } from 'sql.js'
+import { sqlWasmBinary } from './sql-wasm-binary'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
@@ -34,7 +33,7 @@ class SQLiteDB {
   }
 
   private async _doInit(): Promise<void> {
-    const SQL = await initSqlJsAsm()
+    const SQL = await initSqlJs({ wasmBinary: sqlWasmBinary })
 
     if (this.isBlobStorage) {
       const tmpPath = path.join(os.tmpdir(), 'ewaste.sqlite')
@@ -143,7 +142,7 @@ class SQLiteDB {
   }
 
   public async reload(): Promise<void> {
-    const SQL = await initSqlJsAsm()
+    const SQL = await initSqlJs({ wasmBinary: sqlWasmBinary })
     if (fs.existsSync(this.dbFilePath)) {
       const fileBuffer = fs.readFileSync(this.dbFilePath)
       this.db = new SQL.Database(fileBuffer)
