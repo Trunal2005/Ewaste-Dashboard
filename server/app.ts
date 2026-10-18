@@ -19,11 +19,21 @@ const storageAdapter = createStorageAdapter()
 const ADMIN_KEY = process.env.ADMIN_KEY || ''
 
 export function requireAdmin(req: Request, res: Response, next: () => void) {
-  // In development without ADMIN_KEY set, allow open access
-  if (!ADMIN_KEY) return next()
+  const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL)
+
+  // In production, fail closed if ADMIN_KEY is missing or empty
+  if (isProd && !ADMIN_KEY) {
+    return res.status(403).json({
+      error: 'Write operations are locked in production. Owner ADMIN_KEY must be configured.',
+      readOnly: true,
+    })
+  }
+
+  // In local development without ADMIN_KEY, allow open access
+  if (!isProd && !ADMIN_KEY) return next()
 
   const providedKey = req.headers['x-admin-key'] || req.query.adminKey
-  if (providedKey === ADMIN_KEY) {
+  if (providedKey && providedKey === ADMIN_KEY) {
     return next()
   }
 
@@ -704,12 +714,43 @@ apiRouter.post(
 
 // Health check
 apiRouter.get('/health', (_req: Request, res: Response) => {
+  const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME)
+  const hasBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN)
+  const hasTurso = Boolean(process.env.TURSO_DATABASE_URL)
+
+  let storageType = 'Local persistent disk storage'
+  let databaseType = 'Local SQLite (data/ewaste.sqlite)'
+  let durable = true
+
+  if (isVercel) {
+    if (hasBlob) {
+      storageType = 'Vercel Blob Object Storage (Persistent)'
+      databaseType = hasTurso ? 'Turso Cloud SQLite' : 'Vercel Blob Persistent SQLite'
+      durable = true
+    } else {
+      storageType = 'Ephemeral Serverless (/tmp) — Vercel Blob Not Connected'
+      databaseType = 'Ephemeral In-Memory Seed Database'
+      durable = false
+    }
+  }
+
+  const assignments = db.queryAll('SELECT id, (SELECT COUNT(*) FROM assignment_files af WHERE af.assignment_id = assignments.id) as cnt FROM assignments')
+  const filesCount = db.queryOne<{ cnt: number }>('SELECT COUNT(*) as cnt FROM files')
+  const sectionsWithFiles = assignments.filter((a: any) => a.cnt > 0).length
+
   res.json({
     status: 'ok',
-    storage: process.env.BLOB_READ_WRITE_TOKEN ? 'Vercel Blob Storage' : 'Local persistent SQLite + disk storage',
+    durable,
+    storage: storageType,
+    database: databaseType,
+    totalSections: assignments.length,
+    sectionsWithFiles,
+    totalFiles: filesCount?.cnt || 0,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     readOnlyMode: Boolean(ADMIN_KEY),
+    isVercel,
+    hasBlobToken: hasBlob,
   })
 })
 

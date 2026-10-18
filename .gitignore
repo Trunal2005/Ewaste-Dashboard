@@ -18,6 +18,8 @@ data/
 *.sqlite3
 uploads/
 uploads/*
+.backups/
+scratch/
 
 # Environment Secrets & Local Configs
 .env

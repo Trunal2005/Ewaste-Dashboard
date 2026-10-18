@@ -71761,9 +71761,16 @@ app.use(import_express.default.json());
 var storageAdapter = createStorageAdapter();
 var ADMIN_KEY = process.env.ADMIN_KEY || "";
 function requireAdmin(req, res, next) {
-  if (!ADMIN_KEY) return next();
+  const isProd = process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL);
+  if (isProd && !ADMIN_KEY) {
+    return res.status(403).json({
+      error: "Write operations are locked in production. Owner ADMIN_KEY must be configured.",
+      readOnly: true
+    });
+  }
+  if (!isProd && !ADMIN_KEY) return next();
   const providedKey = req.headers["x-admin-key"] || req.query.adminKey;
-  if (providedKey === ADMIN_KEY) {
+  if (providedKey && providedKey === ADMIN_KEY) {
     return next();
   }
   return res.status(403).json({
@@ -72313,12 +72320,39 @@ apiRouter.post(
   }
 );
 apiRouter.get("/health", (_req, res) => {
+  const isVercel2 = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  const hasBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  const hasTurso = Boolean(process.env.TURSO_DATABASE_URL);
+  let storageType = "Local persistent disk storage";
+  let databaseType = "Local SQLite (data/ewaste.sqlite)";
+  let durable = true;
+  if (isVercel2) {
+    if (hasBlob) {
+      storageType = "Vercel Blob Object Storage (Persistent)";
+      databaseType = hasTurso ? "Turso Cloud SQLite" : "Vercel Blob Persistent SQLite";
+      durable = true;
+    } else {
+      storageType = "Ephemeral Serverless (/tmp) \u2014 Vercel Blob Not Connected";
+      databaseType = "Ephemeral In-Memory Seed Database";
+      durable = false;
+    }
+  }
+  const assignments = db.queryAll("SELECT id, (SELECT COUNT(*) FROM assignment_files af WHERE af.assignment_id = assignments.id) as cnt FROM assignments");
+  const filesCount = db.queryOne("SELECT COUNT(*) as cnt FROM files");
+  const sectionsWithFiles = assignments.filter((a) => a.cnt > 0).length;
   res.json({
     status: "ok",
-    storage: process.env.BLOB_READ_WRITE_TOKEN ? "Vercel Blob Storage" : "Local persistent SQLite + disk storage",
+    durable,
+    storage: storageType,
+    database: databaseType,
+    totalSections: assignments.length,
+    sectionsWithFiles,
+    totalFiles: filesCount?.cnt || 0,
     uptime: process.uptime(),
     timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-    readOnlyMode: Boolean(ADMIN_KEY)
+    readOnlyMode: Boolean(ADMIN_KEY),
+    isVercel: isVercel2,
+    hasBlobToken: hasBlob
   });
 });
 app.use("/api", apiRouter);
