@@ -86,10 +86,24 @@ Access locally at:
 
 ## 5. Deployment & Permanent Cloud Storage
 
-The application can be deployed as a single unified service (Node.js + Vite client) or as separate frontend and backend services.
+The application supports both Vercel Serverless Functions and container platforms (Railway / Render).
 
-### Option A: Railway (Recommended for Persistent SQLite & Volume Storage)
-Railway natively supports attaching persistent volumes to containers so files and SQLite survive rebuilds and redeployments permanently:
+### Option A: Vercel Functions + Vercel Blob (Active Live Deployment)
+Deploys frontend statically on Vercel CDN and backend API on Vercel Serverless Functions (`api/index.ts`) with persistent cloud file storage via Vercel Blob:
+1. Connect GitHub repository `Trunal2005/Ewaste-Dashboard` on [Vercel](https://vercel.com).
+2. Attach **Vercel Blob Storage** in 1 click:
+   - Go to Project -> **Storage** tab -> Click **Create** -> Select **Blob** -> Click **Connect to Project**.
+   - Vercel automatically creates and provisions `BLOB_READ_WRITE_TOKEN`.
+3. Set Environment Variables in Vercel Settings -> Environment Variables:
+   - `ADMIN_KEY=your_secure_passcode` (Passcode to unlock owner edit & upload mode)
+   - `NODE_ENV=production`
+4. Migrate all 22 assignments and SQLite records:
+   ```bash
+   npm run migrate:vercel <YOUR_BLOB_READ_WRITE_TOKEN>
+   ```
+
+### Option B: Railway (Persistent Container Volume)
+Railway natively supports attaching persistent volumes to containers so files and SQLite survive rebuilds:
 1. Connect your GitHub repository `Trunal2005/Ewaste-Dashboard` on [Railway](https://railway.app).
 2. Add a **Persistent Volume** mounted at `/app/data` and `/app/uploads`.
 3. Set Environment Variables:
@@ -100,39 +114,26 @@ Railway natively supports attaching persistent volumes to containers so files an
    - `UPLOADS_DIR=/app/uploads`
 4. Deploy the service.
 
-### Option B: Render Web Service
+### Option C: Render Web Service
 1. Connect `Trunal2005/Ewaste-Dashboard` on [Render](https://render.com) as a **Web Service**.
-2. Settings:
-   - **Environment:** Node
-   - **Build Command:** `npm ci && npm run build`
-   - **Start Command:** `npm start`
-3. If using Render Disk (Persistent Storage):
-   - Mount disk at `/var/data`
-   - Set `DB_PATH=/var/data/ewaste.sqlite` and `UPLOADS_DIR=/var/data/uploads`
-4. Set Environment Variables:
-   - `NODE_ENV=production`
-   - `ADMIN_KEY=your_secure_passcode`
+2. Mount Render Disk at `/var/data`, set `DB_PATH=/var/data/ewaste.sqlite` and `UPLOADS_DIR=/var/data/uploads`.
+3. Set `NODE_ENV=production` and `ADMIN_KEY=your_secure_passcode`.
 
 ---
 
 ## 6. Zero-Loss Production Data Migration
 
-To migrate your existing 22 assignment files and SQLite database from your local machine to your deployed production server without committing private documents to public GitHub:
+### For Vercel Deployment (Vercel Blob):
+```bash
+# Migrate local SQLite database and all 22 assignment documents directly to Vercel Blob:
+npx tsx scripts/migrate-to-vercel.ts <BLOB_READ_WRITE_TOKEN> https://ewaste-dashboard-xi.vercel.app
+```
 
+### For Container / Volume Deployments:
 ```bash
 # Run the automated migration script with your live URL and ADMIN_KEY
 npx tsx scripts/migrate-to-prod.ts <YOUR_PRODUCTION_URL> <YOUR_ADMIN_KEY>
 ```
-
-**Example:**
-```bash
-npx tsx scripts/migrate-to-prod.ts https://ewaste-dashboard.up.railway.app my_secret_passcode
-```
-
-The script will:
-1. Bundle local `ewaste.sqlite` and all 22 upload documents.
-2. Securely transmit them to the production `/api/admin/sync-snapshot` endpoint.
-3. Automatically re-verify section counts, file counts, and file download byte integrity on the live server.
 
 ---
 

@@ -1,6 +1,10 @@
-import initSqlJs, { Database, SqlValue } from 'sql.js'
+// @ts-ignore
+import initSqlJsAsm from 'sql.js/dist/sql-asm.js'
+import type { Database, SqlValue } from 'sql.js'
 import fs from 'fs'
 import path from 'path'
+import os from 'os'
+import { put, head, BlobNotFoundError } from '@vercel/blob'
 
 export interface DBRow {
   [key: string]: any
@@ -9,24 +13,99 @@ export interface DBRow {
 class SQLiteDB {
   private db: Database | null = null
   private dbFilePath: string
-  private saveTimeout: NodeJS.Timeout | null = null
+  private isBlobStorage: boolean = false
+  private initPromise: Promise<void> | null = null
 
   constructor(dbFilePath: string) {
     this.dbFilePath = dbFilePath
+    this.isBlobStorage = Boolean(process.env.BLOB_READ_WRITE_TOKEN)
   }
 
-  async init(): Promise<void> {
-    const SQL = await initSqlJs()
-    const dbDir = path.dirname(this.dbFilePath)
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true })
-    }
+  public async init(): Promise<void> {
+    if (this.db) return
+    if (this.initPromise) return this.initPromise
 
-    if (fs.existsSync(this.dbFilePath)) {
-      const fileBuffer = fs.readFileSync(this.dbFilePath)
-      this.db = new SQL.Database(fileBuffer)
+    this.initPromise = this._doInit()
+    try {
+      await this.initPromise
+    } finally {
+      this.initPromise = null
+    }
+  }
+
+  private async _doInit(): Promise<void> {
+    const SQL = await initSqlJsAsm()
+
+    if (this.isBlobStorage) {
+      const tmpPath = path.join(os.tmpdir(), 'ewaste.sqlite')
+      let dbBuffer: Buffer | null = null
+
+      // 1. Try reading from /tmp cache first
+      if (fs.existsSync(tmpPath)) {
+        try {
+          dbBuffer = fs.readFileSync(tmpPath)
+          console.log(`[EWEM DB] Loaded SQLite database from /tmp cache (${dbBuffer.length} bytes)`)
+        } catch (e) {
+          console.warn('[EWEM DB] Failed to read /tmp cache:', e)
+        }
+      }
+
+      // 2. If not in /tmp, fetch from Vercel Blob
+      if (!dbBuffer) {
+        try {
+          const blobPath = 'data/ewaste.sqlite'
+          const details = await head(blobPath).catch((err) => {
+            if (err instanceof BlobNotFoundError || err?.name === 'BlobNotFoundError') return null
+            throw err
+          })
+
+          if (details && details.url) {
+            console.log(`[EWEM DB] Downloading database snapshot from Vercel Blob: ${details.url}`)
+            const res = await fetch(details.url)
+            if (res.ok) {
+              const arrayBuf = await res.arrayBuffer()
+              dbBuffer = Buffer.from(arrayBuf)
+              fs.writeFileSync(tmpPath, dbBuffer)
+              console.log(`[EWEM DB] Restored SQLite database from Vercel Blob (${dbBuffer.length} bytes)`)
+            }
+          }
+        } catch (err) {
+          console.warn('[EWEM DB] Notice: Vercel Blob fetch attempt encountered error:', err)
+        }
+      }
+
+      // 3. Fallback to local file if available
+      if (!dbBuffer && fs.existsSync(this.dbFilePath)) {
+        try {
+          dbBuffer = fs.readFileSync(this.dbFilePath)
+          fs.writeFileSync(tmpPath, dbBuffer)
+          console.log(`[EWEM DB] Loaded SQLite database from local fallback path (${dbBuffer.length} bytes)`)
+        } catch (e) {
+          console.warn('[EWEM DB] Failed to read local fallback:', e)
+        }
+      }
+
+      if (dbBuffer && dbBuffer.length > 0) {
+        this.db = new SQL.Database(dbBuffer)
+      } else {
+        console.log('[EWEM DB] Initializing fresh SQLite database instance')
+        this.db = new SQL.Database()
+      }
+
+      this.dbFilePath = tmpPath
     } else {
-      this.db = new SQL.Database()
+      // Local development disk storage
+      const dbDir = path.dirname(this.dbFilePath)
+      if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true })
+      }
+
+      if (fs.existsSync(this.dbFilePath)) {
+        const fileBuffer = fs.readFileSync(this.dbFilePath)
+        this.db = new SQL.Database(fileBuffer)
+      } else {
+        this.db = new SQL.Database()
+      }
     }
 
     this.createTables()
@@ -34,11 +113,29 @@ class SQLiteDB {
     this.persistSync()
   }
 
-  private persistSync(): void {
+  public persistSync(): void {
     if (!this.db) return
     const data = this.db.export()
     const buffer = Buffer.from(data)
-    fs.writeFileSync(this.dbFilePath, buffer)
+
+    try {
+      const dir = path.dirname(this.dbFilePath)
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+      fs.writeFileSync(this.dbFilePath, buffer)
+    } catch (e) {
+      console.warn('[EWEM DB] Failed to write local DB file:', e)
+    }
+
+    // If using Vercel Blob, upload asynchronously
+    if (this.isBlobStorage) {
+      put('data/ewaste.sqlite', buffer, {
+        access: 'public',
+        addRandomSuffix: false,
+        allowOverwrite: true,
+      }).catch((err) => {
+        console.error('[EWEM DB] Error uploading snapshot to Vercel Blob:', err)
+      })
+    }
   }
 
   public schedulePersist(): void {
@@ -46,7 +143,7 @@ class SQLiteDB {
   }
 
   public async reload(): Promise<void> {
-    const SQL = await initSqlJs()
+    const SQL = await initSqlJsAsm()
     if (fs.existsSync(this.dbFilePath)) {
       const fileBuffer = fs.readFileSync(this.dbFilePath)
       this.db = new SQL.Database(fileBuffer)
